@@ -1,11 +1,11 @@
 package xyz.lonelyleaf.docker.registry.gc.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.afterburner.AfterburnerModule;
 import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import xyz.lonelyleaf.docker.registry.gc.util.JsonUtil;
 
 @Configuration
 public class JacksonConfig {
@@ -28,9 +28,13 @@ public class JacksonConfig {
     }
 
     @Bean
-    public JsonUtil jsonUtil(ObjectMapper objectMapper) {
-        JsonUtil.INSTANCE.setObjectMapper(objectMapper);
-        return new JsonUtil();
+    public Jdk8Module jdk8Module() {
+        return new Jdk8Module();
+    }
+
+    @Bean
+    public JavaTimeModule javaTimeModule() {
+        return new JavaTimeModule();
     }
 
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
+import java.lang.IllegalArgumentException
 import java.lang.RuntimeException
 import java.net.Authenticator
 import java.net.PasswordAuthentication
@@ -15,7 +16,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 @Suppress("JoinDeclarationAndAssignment")
-class DockerRegistryClient(
+open class DockerRegistryClient(
         private val baseUrl: String,
         private val user: String? = null,
         private val pass: String? = null,
@@ -30,13 +31,22 @@ class DockerRegistryClient(
     private val client: HttpClient
 
     init {
-        client = HttpClient.newBuilder()
-                .authenticator(object : Authenticator() {
-                    override fun getPasswordAuthentication(): PasswordAuthentication {
-                        return PasswordAuthentication(user, pass?.toCharArray())
-                    }
-                })
-                .build()
+        @Suppress("UselessCallOnNotNull")
+        if (baseUrl.isNullOrEmpty()) {
+            throw IllegalArgumentException("baseUrl can not be null")
+        }
+
+        client = if (!user.isNullOrEmpty() || !pass.isNullOrEmpty()) {
+            HttpClient.newBuilder()
+                    .authenticator(object : Authenticator() {
+                        override fun getPasswordAuthentication(): PasswordAuthentication {
+                            return PasswordAuthentication(user, pass?.toCharArray())
+                        }
+                    })
+                    .build()
+        } else {
+            HttpClient.newBuilder().build()
+        }
     }
 
     /**
