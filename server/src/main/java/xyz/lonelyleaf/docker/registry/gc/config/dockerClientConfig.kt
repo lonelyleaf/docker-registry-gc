@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import xyz.lonelyleaf.docker.registry.gc.DockerRegistryClient
+import java.util.regex.Pattern
 
 @Configuration
 @EnableConfigurationProperties(DockerClientProperties::class)
@@ -23,8 +24,15 @@ class DockerClientConfig {
 }
 
 @ConfigurationProperties(prefix = "docker.registry")
-data class DockerClientProperties(
-        val baseUrl: String,
-        val user: String? = null,
-        val pass: String? = null
-)
+class DockerClientProperties {
+
+    var baseUrl: String = ""
+    var user: String? = null
+    var pass: String? = null
+    var cleanup: List<RegistryCleanupRule> = emptyList()
+
+    data class RegistryCleanupRule(
+            val pattern: Pattern
+    )
+
+}
