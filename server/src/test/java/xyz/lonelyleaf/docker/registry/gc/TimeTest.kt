@@ -16,6 +16,7 @@ class TimeTest {
 
         val dayWithHour = Duration.parse("P2DT12H")
         Assert.assertEquals(60,dayWithHour.toHours())
+
     }
 
 

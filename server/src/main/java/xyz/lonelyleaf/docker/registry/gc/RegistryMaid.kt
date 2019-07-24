@@ -37,7 +37,7 @@ class RegistryMaid {
             }
         }
 
-        matchers.parallelStream()
+        matchers.stream()
                 .flatMap { (imageName, rule) ->
                     val tags = client.tagList(imageName).tags
                     val matchedTags = findMatchedTags(tags, rule)
@@ -46,7 +46,7 @@ class RegistryMaid {
                 .filter { (imageName, tag, rule) ->
                     try {
                         val created = client.manifest(imageName, tag).firstV1Compatibility(mapper).created
-                        return@filter LocalDateTime.now().isAfter(created.plus(rule.durationToKeep))
+                        return@filter LocalDateTime.now().isBefore(created.plus(rule.durationToKeep))
                     } catch (e: Exception) {
                         logger.error("get image manifest fail", e)
                         return@filter false

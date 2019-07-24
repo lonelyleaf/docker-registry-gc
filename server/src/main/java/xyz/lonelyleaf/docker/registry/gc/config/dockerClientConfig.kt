@@ -32,34 +32,34 @@ class DockerRegistryProperties {
     var cleanup: List<RegistryCleanupRuleDto> = emptyList()
 }
 
-data class RegistryCleanupRuleDto(
-        /**
-         * image name regexp [Pattern],matched image will be deleted
-         */
-        val image: String,
-        /**
-         * image tag regexp [Pattern],matched image will be deleted.If is null,all tag will
-         * be matched.
-         * */
-        val tag: String?,
-        /**
-         * ISO 8601 duration format string.Any image match [image] and [tag]
-         * before this duration will be deleted.
-         *
-         * For example:
-         *
-         * - "PT20.345S" -- parses as "20.345 seconds"
-         * - "PT15M"     -- parses as "15 minutes"
-         * - "PT10H"     -- parses as "10 hours"
-         * - "P2D"       -- parses as "2 days"
-         * - "P2DT3H4M"  -- parses as "2 days, 3 hours and 4 minutes"
-         * - "PT-6H3M"    -- parses as "-6 hours and +3 minutes"
-         * - "-PT6H3M"    -- parses as "-6 hours and -3 minutes"
-         * - "-PT-6H+3M"  -- parses as "+6 hours and -3 minutes"
-         *
-         */
-        val durationToKeep: String
-) {
+class RegistryCleanupRuleDto {
+
+    /**
+     * image name regexp [Pattern],matched image will be deleted
+     */
+    var image: String = ""
+    /**
+     * image tag regexp [Pattern],matched image will be deleted.If is null,all tag will
+     * be matched.
+     * */
+    var tag: String? = ""
+    /**
+     * ISO 8601 duration format string.Any image match [image] and [tag]
+     * before this duration will be deleted.
+     *
+     * For example:
+     *
+     * - "PT20.345S" -- parses as "20.345 seconds"
+     * - "PT15M"     -- parses as "15 minutes"
+     * - "PT10H"     -- parses as "10 hours"
+     * - "P2D"       -- parses as "2 days"
+     * - "P2DT3H4M"  -- parses as "2 days, 3 hours and 4 minutes"
+     * - "PT-6H3M"    -- parses as "-6 hours and +3 minutes"
+     * - "-PT6H3M"    -- parses as "-6 hours and -3 minutes"
+     * - "-PT-6H+3M"  -- parses as "+6 hours and -3 minutes"
+     *
+     */
+    var durationToKeep: String = ""
 
     val rule: Rule by lazy {
         return@lazy Rule(Pattern.compile(this@RegistryCleanupRuleDto.image),
