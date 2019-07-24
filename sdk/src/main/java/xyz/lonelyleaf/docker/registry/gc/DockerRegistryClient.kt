@@ -50,6 +50,16 @@ open class DockerRegistryClient(
     }
 
     /**
+     * check has permission or is conective
+     */
+    fun check(): Boolean {
+        val uri = URI("$baseUrl/v2/")
+        val request = HttpRequest.newBuilder(uri).GET().build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        return response.statusCode() in 200..299
+    }
+
+    /**
      * get a list of image from registry
      */
     fun catalog(): Catalog {
@@ -67,7 +77,7 @@ open class DockerRegistryClient(
     /**
      * @param name like 'mysql','openjdk' without tag
      */
-    fun tagList(name: String): TagList {
+    fun tagList(name: String): TagResponse {
         val uri =
                 URI("$baseUrl/v2/$name/tags/list")
         val request = HttpRequest.newBuilder(uri).GET().build()
@@ -100,6 +110,8 @@ open class DockerRegistryClient(
     /**
      * @param name like 'mysql','openjdk' without tag
      * @param tag like 'v1.0'
+     *
+     * @return 'ok' if success, 'not found' if no image found to delete.
      */
     fun deleteManifest(name: String, tag: String): String {
         val uri =
@@ -108,11 +120,9 @@ open class DockerRegistryClient(
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         return when (response.statusCode()) {
             in 200..299 -> {
-                println("delete success $name:$tag")
                 "ok"
             }
             404 -> {
-                println("can't find image $name:$tag")
                 "not found"
             }
             else -> {

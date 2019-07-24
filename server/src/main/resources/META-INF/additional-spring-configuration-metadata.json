@@ -2,7 +2,7 @@
   "properties": [
     {
       "name": "dcoker.registry",
-      "type": "xyz.lonelyleaf.docker.registry.gc.config.DockerClientProperties",
+      "type": "xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryProperties",
       "description": "docker client properties."
     }
   ] }
