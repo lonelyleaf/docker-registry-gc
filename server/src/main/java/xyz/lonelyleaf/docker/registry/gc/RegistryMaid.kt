@@ -3,7 +3,6 @@ package xyz.lonelyleaf.docker.registry.gc
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryProperties
 import xyz.lonelyleaf.docker.registry.gc.config.RegistryCleanupRuleDto
@@ -36,22 +35,30 @@ class RegistryMaid {
                 }
             }
         }
+        val imageListStr = matchers.map { it.first }.joinToString(separator = ",")
+        logger.info("find matched images $imageListStr")
 
-        matchers.stream()
+        matchers.parallelStream()
                 .flatMap { (imageName, rule) ->
+                    println("find tag " + LocalDateTime.now())
                     val tags = client.tagList(imageName).tags
                     val matchedTags = findMatchedTags(tags, rule)
                     return@flatMap matchedTags.map { Triple(imageName, it, rule) }.stream()
                 }
                 .filter { (imageName, tag, rule) ->
                     try {
+                        //this request may be quite slow
                         val created = client.manifest(imageName, tag).firstV1Compatibility(mapper).created
-                        return@filter LocalDateTime.now().isBefore(created.plus(rule.durationToKeep))
+                        //todo 这里好像有问题，时间规则不对
+                        return@filter (LocalDateTime.now() - rule.durationToKeep).isBefore(created)
+//                        val willBeDeleted = LocalDateTime.now().isBefore(created.plus(rule.durationToKeep))
+//                        return@filter willBeDeleted
                     } catch (e: Exception) {
                         logger.error("get image manifest fail", e)
                         return@filter false
                     }
                 }
+                .sequential()
                 .forEach { (imageName, tag, _) ->
                     try {
                         client.deleteManifest(imageName, tag)
