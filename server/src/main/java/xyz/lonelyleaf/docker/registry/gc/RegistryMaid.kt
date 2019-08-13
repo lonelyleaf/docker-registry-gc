@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component
 import xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryProperties
 import xyz.lonelyleaf.docker.registry.gc.config.RegistryCleanupRuleDto
 import java.lang.RuntimeException
+import java.time.Duration
 import java.time.LocalDateTime
 
 /**
@@ -58,10 +59,9 @@ class RegistryMaid {
                     if (imageInfo == null) {
                         return@filter false
                     } else {
-                        //this request may be quite slow
                         val created = imageInfo.lastModified
-                        val before = (LocalDateTime.now() - rule.durationToKeep)
-                        return@filter before.isBefore(created)
+                        val isBefore = Duration.between(created, LocalDateTime.now()) > rule.durationToKeep
+                        return@filter isBefore
                     }
                 }
                 //.sequential()
