@@ -7,13 +7,15 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.lang.IllegalArgumentException
-import java.lang.RuntimeException
+import java.lang.IllegalStateException
 import java.net.Authenticator
 import java.net.PasswordAuthentication
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @Suppress("JoinDeclarationAndAssignment")
 open class DockerRegistryClient(
@@ -70,7 +72,7 @@ open class DockerRegistryClient(
             //成功
             return mapper.readValue(response.body())
         } else {
-            throw RuntimeException("request fail ${response.statusCode()} ${response.body()}")
+            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
         }
     }
 
@@ -86,7 +88,7 @@ open class DockerRegistryClient(
             //成功
             return mapper.readValue(response.body())
         } else {
-            throw RuntimeException("request fail ${response.statusCode()} ${response.body()}")
+            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
         }
     }
 
@@ -95,15 +97,81 @@ open class DockerRegistryClient(
      * @param tag like 'v1.0'
      */
     fun manifest(name: String, tag: String): Manifest {
+        val uri = URI("$baseUrl/v2/$name/manifests/$tag")
+        val request = HttpRequest.newBuilder(uri).GET()
+                .header("Accept", "application/vnd.docker.distribution.manifest.v1+json")
+                .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() in 200..299) {
+            val manifest = mapper.readValue<Manifest>(response.body())
+
+            val lastModified = response.headers().firstValue("last-modified")
+            if (lastModified.isPresent) {
+                val time = LocalDateTime.parse(lastModified.get(), DateTimeFormatter.RFC_1123_DATE_TIME)
+                manifest.lastModified = time
+            }
+
+            return manifest
+        } else {
+            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
+        }
+    }
+
+    /**
+     * get simple image info but not the whole image manifest by request a HEAD request
+     */
+    fun imageInfo(name: String, tag: String): ImageInfo {
+        val uri = URI("$baseUrl/v2/$name/manifests/$tag")
+        val request = HttpRequest.newBuilder(uri)
+                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+                .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() in 200..299) {
+
+            val digest = response.headers().firstValue("docker-content-digest")
+                    .orElseThrow { IllegalStateException("can't get image digest $name:$tag") }
+
+            val lastModifiedStr = response.headers().firstValue("last-modified")
+                    .orElseThrow { IllegalStateException("can't get image lastModified $name:$tag") }
+            val lastModified = LocalDateTime.parse(lastModifiedStr, DateTimeFormatter.RFC_1123_DATE_TIME)
+
+            return ImageInfo(name, tag, digest, lastModified)
+        } else {
+            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
+        }
+    }
+
+
+    /**
+     * add Accept: application/vnd.docker.distribution.manifest.v2+json in header，and get manifest with digest
+     *
+     * @param name like 'mysql','openjdk' without tag
+     * @param tag like 'v1.0'
+     */
+    fun manifestV2(name: String, tag: String): ManifestV2 {
         val uri =
                 URI("$baseUrl/v2/$name/manifests/$tag")
-        val request = HttpRequest.newBuilder(uri).GET().build()
+        val request = HttpRequest.newBuilder(uri).GET()
+                .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+                .build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         if (response.statusCode() in 200..299) {
             //成功
-            return mapper.readValue(response.body())
+            val manifest = mapper.readValue<ManifestV2>(response.body())
+
+            manifest.contentDigest = response.headers().firstValue("docker-content-digest")
+                    .orElseThrow { IllegalStateException("can't get image digest $name:$tag") }
+
+            val lastModified = response.headers().firstValue("last-modified")
+            if (lastModified.isPresent) {
+                val time = LocalDateTime.parse(lastModified.get(), DateTimeFormatter.RFC_1123_DATE_TIME)
+                manifest.lastModified = time
+            }
+
+            return manifest
         } else {
-            throw RuntimeException("request fail ${response.statusCode()} ${response.body()}")
+            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
         }
     }
 
@@ -126,7 +194,7 @@ open class DockerRegistryClient(
                 "not found"
             }
             else -> {
-                throw RuntimeException("request fail ${response.statusCode()} ${response.body()}")
+                throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
             }
         }
     }

@@ -14,11 +14,11 @@ class CleanupJob {
     private lateinit var registryMaid: RegistryMaid
 
     //every 15min
-    @Scheduled(fixedDelay = (1000 * 60 * 15).toLong())
+    @Scheduled(fixedDelay = (1000 * 60 * 30).toLong())
     fun cleanup() {
-        logger.info("start cleanup")
+        logger.info("*****start cleanup*****")
         registryMaid.cleanup()
-        logger.info("cleanup done")
+        logger.info("****cleanup done****")
     }
 
 }

@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryProperties
 import xyz.lonelyleaf.docker.registry.gc.config.RegistryCleanupRuleDto
+import java.lang.RuntimeException
 import java.time.LocalDateTime
 
 /**
@@ -40,29 +41,43 @@ class RegistryMaid {
 
         matchers.parallelStream()
                 .flatMap { (imageName, rule) ->
-                    println("find tag " + LocalDateTime.now())
                     val tags = client.tagList(imageName).tags
                     val matchedTags = findMatchedTags(tags, rule)
                     return@flatMap matchedTags.map { Triple(imageName, it, rule) }.stream()
                 }
-                .filter { (imageName, tag, rule) ->
+                .map { (imageName, tag, rule) ->
                     try {
-                        //this request may be quite slow
-                        val created = client.manifest(imageName, tag).firstV1Compatibility(mapper).created
-                        //todo 这里好像有问题，时间规则不对
-                        return@filter (LocalDateTime.now() - rule.durationToKeep).isBefore(created)
-//                        val willBeDeleted = LocalDateTime.now().isBefore(created.plus(rule.durationToKeep))
-//                        return@filter willBeDeleted
+                        //use HEAD to get image info is much quicker than get the whole image manifest
+                        return@map Pair(client.imageInfo(imageName, tag), rule)
                     } catch (e: Exception) {
                         logger.error("get image manifest fail", e)
+                        return@map Pair(null, rule)
+                    }
+                }
+                .filter { (imageInfo, rule) ->
+                    if (imageInfo == null) {
                         return@filter false
+                    } else {
+                        //this request may be quite slow
+                        val created = imageInfo.lastModified
+                        val before = (LocalDateTime.now() - rule.durationToKeep)
+                        return@filter before.isBefore(created)
                     }
                 }
                 .sequential()
-                .forEach { (imageName, tag, _) ->
+                .forEach { (imageInfo: ImageInfo?, rule) ->
+                    val name = imageInfo!!.image
+                    val tag = imageInfo!!.tag
                     try {
-                        client.deleteManifest(imageName, tag)
-                        logger.info("delete image $imageName:$tag success")
+                        val digest = client.manifestV2(name, tag).contentDigest
+                        //no need to do this again,delete by digest is better
+                        //val resultTag = client.deleteManifest(imageName, tag)
+                        val resultDigest = client.deleteManifest(name, digest)
+                        when (resultDigest) {
+                            "ok" -> logger.info("delete image success $name:$tag digest:$digest ")
+                            "not found" -> logger.warn("delete image not found $name:$tag digest:$digest")
+                            else -> throw RuntimeException("bad result")
+                        }
                     } catch (e: Exception) {
                         logger.error("delete image fail", e)
                     }

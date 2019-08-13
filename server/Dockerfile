@@ -2,7 +2,6 @@
 # 可以通用的Dockerfile
 FROM openjdk:11.0.2-alpine
 
-#创建应用目录，并修改时区为中国
 RUN mkdir /app
 
 WORKDIR /app
