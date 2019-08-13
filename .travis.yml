@@ -4,9 +4,26 @@ jdk: openjdk11
 dist: trusty
 install: true
 
+env:
+  - DB=postgres
+  - SH=bash
+  - PACKAGE_VERSION="1.0.*"
+
+services:
+  - docker
+
+deploy:
+  provider: script
+  script: bash docker_push.sh
+  on:
+    branch: master
+
 script:
   - chmod +x ./gradlew
   - ./gradlew clean bootJar
+  - docker build -t lonelyleaf/docker-registry-gc:$TRAVIS_TAG
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push lonelyleaf/docker-registry-gc:$TRAVIS_TAG
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
