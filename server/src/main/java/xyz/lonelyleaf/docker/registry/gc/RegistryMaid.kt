@@ -64,22 +64,21 @@ class RegistryMaid {
                         return@filter before.isBefore(created)
                     }
                 }
-                .sequential()
-                .forEach { (imageInfo: ImageInfo?, rule) ->
-                    val name = imageInfo!!.image
-                    val tag = imageInfo!!.tag
+                //.sequential()
+                .forEach { (imageInfo: ImageInfo?, _) ->
+                    val (image, tag, digest, _) = imageInfo!!
                     try {
-                        val digest = client.manifestV2(name, tag).contentDigest
+                        //val digest = client.manifestV2(name, tag).contentDigest
                         //no need to do this again,delete by digest is better
                         //val resultTag = client.deleteManifest(imageName, tag)
-                        val resultDigest = client.deleteManifest(name, digest)
-                        when (resultDigest) {
-                            "ok" -> logger.info("delete image success $name:$tag digest:$digest ")
-                            "not found" -> logger.warn("delete image not found $name:$tag digest:$digest")
+                        val result = client.deleteManifest(image, digest)
+                        when (result) {
+                            DeleteResult.OK -> logger.info("delete image success $image:$tag digest:$digest ")
+                            DeleteResult.NOT_FOUND -> logger.warn("delete image not found $image:$tag digest:$digest")
                             else -> throw RuntimeException("bad result")
                         }
                     } catch (e: Exception) {
-                        logger.error("delete image fail", e)
+                        logger.error("delete image fail $imageInfo", e)
                     }
                 }
     }

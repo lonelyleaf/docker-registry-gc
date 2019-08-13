@@ -22,7 +22,7 @@ compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-ext{
+ext {
     jacksonVersion = "2.9.9"
 }
 
@@ -38,5 +38,9 @@ dependencies {
     implementation "com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion"
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+
+    //using jdk's httpclient will recive http2's GOAWAY exception
+    //okhttp do not have this issue
+    implementation "com.squareup.okhttp3:okhttp:4.1.0"
 }
 

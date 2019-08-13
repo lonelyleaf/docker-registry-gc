@@ -6,16 +6,13 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
+import okhttp3.*
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
-import java.net.Authenticator
-import java.net.PasswordAuthentication
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.TimeUnit
 
 @Suppress("JoinDeclarationAndAssignment")
 open class DockerRegistryClient(
@@ -30,7 +27,7 @@ open class DockerRegistryClient(
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 ) {
 
-    private val client: HttpClient
+    private val client: OkHttpClient
 
     init {
         @Suppress("UselessCallOnNotNull")
@@ -38,41 +35,53 @@ open class DockerRegistryClient(
             throw IllegalArgumentException("baseUrl can not be null")
         }
 
-        client = if (!user.isNullOrEmpty() || !pass.isNullOrEmpty()) {
-            HttpClient.newBuilder()
-                    .authenticator(object : Authenticator() {
-                        override fun getPasswordAuthentication(): PasswordAuthentication {
-                            return PasswordAuthentication(user, pass?.toCharArray())
-                        }
-                    })
-                    .build()
-        } else {
-            HttpClient.newBuilder().build()
+        val builder = OkHttpClient.Builder()
+        if (!user.isNullOrEmpty() || !pass.isNullOrEmpty()) {
+            builder.authenticator(authenticator = object : okhttp3.Authenticator {
+                override fun authenticate(route: Route?, response: Response): Request? {
+                    val credential = Credentials.basic(user!!, pass!!)
+                    return response.request.newBuilder().header("Authorization", credential).build()
+                }
+            })
         }
+
+        builder.readTimeout(30, TimeUnit.SECONDS)
+        builder.writeTimeout(15, TimeUnit.SECONDS)
+        builder.connectionPool(ConnectionPool(1, 30, TimeUnit.SECONDS))
+        client = builder.build()
+
+        //todo may check here
+        //val response = check()
+        //if (!response.isSuccessful) {
+        //    throw IllegalStateException("");
+        //}
+
     }
 
     /**
      * check has permission or is conective
      */
-    fun check(): Boolean {
-        val uri = URI("$baseUrl/v2/")
-        val request = HttpRequest.newBuilder(uri).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        return response.statusCode() in 200..299
+    fun check(): Response {
+        val request = Request.Builder()
+                .url("$baseUrl/v2/").get().build()
+        val response = client.newCall(request).execute()
+        return response
     }
 
     /**
      * get a list of image from registry
      */
     fun catalog(): Catalog {
-        val uri = URI("$baseUrl/v2/_catalog")
-        val request = HttpRequest.newBuilder(uri).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() in 200..299) {
-            //成功
-            return mapper.readValue(response.body())
-        } else {
-            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
+        val request = Request.Builder()
+                .url("$baseUrl/v2/_catalog").get().build()
+        val response = client.newCall(request).execute()
+        response.use {
+            if (response.isSuccessful) {
+                //成功
+                return mapper.readValue<Catalog>(response.body!!.byteStream())
+            } else {
+                throw HttpRequestFailException("request fail ${response.code} ${response.body?.string()}", response)
+            }
         }
     }
 
@@ -80,15 +89,16 @@ open class DockerRegistryClient(
      * @param name like 'mysql','openjdk' without tag
      */
     fun tagList(name: String): TagResponse {
-        val uri =
-                URI("$baseUrl/v2/$name/tags/list")
-        val request = HttpRequest.newBuilder(uri).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() in 200..299) {
-            //成功
-            return mapper.readValue(response.body())
-        } else {
-            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
+        val request = Request.Builder()
+                .url("$baseUrl/v2/$name/tags/list").get().build()
+        val response = client.newCall(request).execute()
+        response.use {
+            if (response.isSuccessful) {
+                //成功
+                return mapper.readValue(response.body!!.byteStream())
+            } else {
+                throw HttpRequestFailException("request fail ${response.code} ${response.body?.string()}", response)
+            }
         }
     }
 
@@ -97,23 +107,25 @@ open class DockerRegistryClient(
      * @param tag like 'v1.0'
      */
     fun manifest(name: String, tag: String): Manifest {
-        val uri = URI("$baseUrl/v2/$name/manifests/$tag")
-        val request = HttpRequest.newBuilder(uri).GET()
+        val request = Request.Builder()
+                .url("$baseUrl/v2/$name/manifests/$tag").get()
                 .header("Accept", "application/vnd.docker.distribution.manifest.v1+json")
                 .build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() in 200..299) {
-            val manifest = mapper.readValue<Manifest>(response.body())
+        val response = client.newCall(request).execute()
+        response.use {
+            if (response.isSuccessful) {
+                val manifest = mapper.readValue<Manifest>(response.body!!.byteStream())
 
-            val lastModified = response.headers().firstValue("last-modified")
-            if (lastModified.isPresent) {
-                val time = LocalDateTime.parse(lastModified.get(), DateTimeFormatter.RFC_1123_DATE_TIME)
-                manifest.lastModified = time
+                val lastModified = response.header("last-modified")
+                if (lastModified != null) {
+                    val time = LocalDateTime.parse(lastModified, DateTimeFormatter.RFC_1123_DATE_TIME)
+                    manifest.lastModified = time
+                }
+
+                return manifest
+            } else {
+                throw HttpRequestFailException("request fail ${response.code} ${response.body?.string()}", response)
             }
-
-            return manifest
-        } else {
-            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
         }
     }
 
@@ -121,24 +133,25 @@ open class DockerRegistryClient(
      * get simple image info but not the whole image manifest by request a HEAD request
      */
     fun imageInfo(name: String, tag: String): ImageInfo {
-        val uri = URI("$baseUrl/v2/$name/manifests/$tag")
-        val request = HttpRequest.newBuilder(uri)
-                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+        val request = Request.Builder()
+                .url("$baseUrl/v2/$name/manifests/$tag").head()
                 .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
                 .build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() in 200..299) {
+        val response = client.newCall(request).execute()
+        response.use {
+            if (response.isSuccessful) {
 
-            val digest = response.headers().firstValue("docker-content-digest")
-                    .orElseThrow { IllegalStateException("can't get image digest $name:$tag") }
+                val digest = response.header("docker-content-digest")
+                        ?: throw IllegalStateException("can't get image digest $name:$tag")
 
-            val lastModifiedStr = response.headers().firstValue("last-modified")
-                    .orElseThrow { IllegalStateException("can't get image lastModified $name:$tag") }
-            val lastModified = LocalDateTime.parse(lastModifiedStr, DateTimeFormatter.RFC_1123_DATE_TIME)
+                val lastModifiedStr = response.header("last-modified")
+                        ?: throw IllegalStateException("can't get image lastModified $name:$tag")
+                val lastModified = LocalDateTime.parse(lastModifiedStr, DateTimeFormatter.RFC_1123_DATE_TIME)
 
-            return ImageInfo(name, tag, digest, lastModified)
-        } else {
-            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
+                return ImageInfo(name, tag, digest, lastModified)
+            } else {
+                throw HttpRequestFailException("request fail ${response.code} ${response.body?.string()}", response)
+            }
         }
     }
 
@@ -150,53 +163,64 @@ open class DockerRegistryClient(
      * @param tag like 'v1.0'
      */
     fun manifestV2(name: String, tag: String): ManifestV2 {
-        val uri =
-                URI("$baseUrl/v2/$name/manifests/$tag")
-        val request = HttpRequest.newBuilder(uri).GET()
+        val request = Request.Builder()
+                .url("$baseUrl/v2/$name/manifests/$tag").get()
                 .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
                 .build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() in 200..299) {
-            //成功
-            val manifest = mapper.readValue<ManifestV2>(response.body())
+        val response = client.newCall(request).execute()
+        response.use {
+            if (response.isSuccessful) {
+                //成功
+                val manifest = mapper.readValue<ManifestV2>(response.body!!.byteStream())
 
-            manifest.contentDigest = response.headers().firstValue("docker-content-digest")
-                    .orElseThrow { IllegalStateException("can't get image digest $name:$tag") }
+                val digest = response.header("docker-content-digest")
+                        ?: throw IllegalStateException("can't get image digest $name:$tag")
 
-            val lastModified = response.headers().firstValue("last-modified")
-            if (lastModified.isPresent) {
-                val time = LocalDateTime.parse(lastModified.get(), DateTimeFormatter.RFC_1123_DATE_TIME)
-                manifest.lastModified = time
+                val lastModifiedStr = response.header("last-modified")
+                        ?: throw IllegalStateException("can't get image lastModified $name:$tag")
+                val lastModified = LocalDateTime.parse(lastModifiedStr, DateTimeFormatter.RFC_1123_DATE_TIME)
+
+                manifest.contentDigest = digest
+                manifest.lastModified = lastModified
+
+                return manifest
+            } else {
+                throw HttpRequestFailException("request fail ${response.code} ${response.body?.string()}", response)
             }
-
-            return manifest
-        } else {
-            throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
         }
     }
 
     /**
+     * delete image by tag or digest
+     *
      * @param name like 'mysql','openjdk' without tag
-     * @param tag like 'v1.0'
+     * @param tag tag or digest,like 'v1.0' or sha256:aa4410529538c24e5816e770e4a67c97992c21cdf8dae0dfa481e1db70a3aa2b
      *
      * @return 'ok' if success, 'not found' if no image found to delete.
      */
-    fun deleteManifest(name: String, tag: String): String {
-        val uri =
-                URI("$baseUrl/v2/$name/manifests/$tag")
-        val request = HttpRequest.newBuilder(uri).DELETE().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        return when (response.statusCode()) {
-            in 200..299 -> {
-                "ok"
-            }
-            404 -> {
-                "not found"
-            }
-            else -> {
-                throw HttpRequestFailException("request fail ${response.statusCode()} ${response.body()}", response)
+    fun deleteManifest(name: String, tag: String): DeleteResult {
+        val request = Request.Builder()
+                .url("$baseUrl/v2/$name/manifests/$tag").delete()
+                .build()
+
+        val response = client.newCall(request).execute()
+        response.use {
+            return when {
+                response.isSuccessful -> {
+                    DeleteResult.OK
+                }
+                response.code == 404 -> {
+                    DeleteResult.NOT_FOUND
+                }
+                else -> {
+                    throw HttpRequestFailException("request fail ${response.code} ${response.body?.string()}", response)
+                }
             }
         }
     }
 
+}
+
+enum class DeleteResult {
+    OK, NOT_FOUND
 }

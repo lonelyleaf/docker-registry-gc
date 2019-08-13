@@ -1,6 +1,5 @@
 package xyz.lonelyleaf.docker.registry.gc
 
-import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.time.LocalDateTime
@@ -36,9 +35,9 @@ data class Manifest(
 
 data class ManifestV2(
         val schemaVersion: Int,
-        val mediaType: String,
-        val config: Layer,
-        val layers: List<Layer>
+        val mediaType: String?,
+        val config: Layer?,
+        val layers: List<Layer>?
 ) {
 
     var contentDigest: String = ""
@@ -51,6 +50,7 @@ data class ManifestV2(
     )
 
 }
+
 
 /**
  * simple image info
