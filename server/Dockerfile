@@ -1,6 +1,6 @@
 # 本文件由gmt-meta-scan于 2018-07-09 16:08:02 自动生成
 # 可以通用的Dockerfile
-FROM openjdk:11.0.2-alpine
+FROM openjdk:11-jre
 
 RUN mkdir /app
 
