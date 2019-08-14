@@ -8,12 +8,16 @@ services:
   - docker
 
 deploy:
-  provider: script
-  skip_cleanup: true
-  script: bash docker_push.sh
-  on:
-    branch: master
-    tags: true
+  - provider: script
+    skip_cleanup: true
+    script: bash docker_push.sh
+    on:
+      tags: true
+  - provider: script
+    skip_cleanup: true
+    script: bash docker_push.sh
+    on:
+      branch: master
 
 script:
   - chmod +x ./gradlew

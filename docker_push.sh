@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $TRAVIS_TAG ];then
+if [ $TRAVIS_TAG ]; then
   image="lonelyleaf/docker-registry-gc:$TRAVIS_TAG"
 else
   image="lonelyleaf/docker-registry-gc"
