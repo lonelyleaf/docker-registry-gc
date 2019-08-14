@@ -6,32 +6,67 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import xyz.lonelyleaf.docker.registry.gc.DockerRegistryClient
+import org.springframework.scheduling.TaskScheduler
+import xyz.lonelyleaf.docker.registry.gc.CleanupJob
 import java.time.Duration
 import java.util.regex.Pattern
+import javax.validation.constraints.NotEmpty
 
 @Configuration
-@EnableConfigurationProperties(DockerRegistryProperties::class)
-class DockerClientConfig {
+@EnableConfigurationProperties(DockerRegistryGc::class)
+class DockerRegistryGcConfig {
 
     @Autowired
-    lateinit var prop: DockerRegistryProperties
+    lateinit var prop: DockerRegistryGc
 
     @Bean
-    fun dockerRegistryClient(mapper: ObjectMapper): DockerRegistryClient {
-        return DockerRegistryClient(prop.baseUrl, prop.user, prop.pass, mapper)
+    fun cleanupJob(taskScheduler: TaskScheduler, mapper: ObjectMapper): CleanupJob {
+        return CleanupJob(prop, mapper, taskScheduler)
     }
 
 }
 
-@ConfigurationProperties(prefix = "docker.registry")
-class DockerRegistryProperties {
+@ConfigurationProperties(prefix = "docker.gc")
+class DockerRegistryGc {
+    var registry: List<DockerRegistry> = emptyList()
+}
+
+class DockerRegistry {
+    @NotEmpty
     var baseUrl: String = ""
     var user: String? = null
     var pass: String? = null
+    var scheduler: SchedulerDto = SchedulerDto()
     var cleanup: List<RegistryCleanupRuleDto> = emptyList()
 }
 
+/**
+ * define when to clean up
+ */
+class SchedulerDto {
+    var fix: String? = null
+    var cron: String? = null
+
+    val scheduler: Scheduler by lazy {
+        if (cron.isNullOrEmpty() && fix.isNullOrEmpty()) {
+            return@lazy Scheduler(Duration.ofHours(1), null)
+        } else if (fix.isNullOrEmpty()) {
+            return@lazy Scheduler(null, this.cron)
+        } else {
+            return@lazy Scheduler(Duration.parse(fix), this.cron)
+        }
+    }
+
+    data class Scheduler(
+            var fix: Duration? = null,
+            var cron: String? = null
+    )
+
+}
+
+/**
+ * define which image to clean up
+ */
 class RegistryCleanupRuleDto {
 
     /**

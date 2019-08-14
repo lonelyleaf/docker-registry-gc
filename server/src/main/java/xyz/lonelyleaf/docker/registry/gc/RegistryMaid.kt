@@ -1,29 +1,20 @@
 package xyz.lonelyleaf.docker.registry.gc
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.stereotype.Component
-import xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryProperties
+import xyz.lonelyleaf.docker.registry.gc.config.DockerRegistry
 import xyz.lonelyleaf.docker.registry.gc.config.RegistryCleanupRuleDto
-import java.lang.RuntimeException
 import java.time.Duration
 import java.time.LocalDateTime
 
 /**
  * clean up your registry
  */
-@Component
-class RegistryMaid {
+class RegistryMaid(
+        private val prop: DockerRegistry,
+        private val client: DockerRegistryClient
+) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
-
-    @Autowired
-    private lateinit var prop: DockerRegistryProperties
-    @Autowired
-    private lateinit var client: DockerRegistryClient
-    @Autowired
-    private lateinit var mapper: ObjectMapper
 
     fun cleanup() {
         val images = client.catalog().repositories

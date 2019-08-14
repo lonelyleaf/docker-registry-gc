@@ -1,8 +1,9 @@
 {
   "properties": [
     {
-      "name": "dcoker.registry",
-      "type": "xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryProperties",
-      "description": "docker client properties."
+      "name": "dcoker.registry.gc",
+      "type": "xyz.lonelyleaf.docker.registry.gc.config.DockerRegistryGc",
+      "description": "docker clean up properties."
     }
-  ] }
+  ]
+}
