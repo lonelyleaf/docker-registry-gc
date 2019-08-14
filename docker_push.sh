@@ -3,7 +3,7 @@
 if [ $TRAVIS_TAG ]; then
   image="lonelyleaf/docker-registry-gc:$TRAVIS_TAG"
 else
-  image="lonelyleaf/docker-registry-gc"
+  image="lonelyleaf/docker-registry-gc:latest"
 fi
 
 cd ./server || exit
