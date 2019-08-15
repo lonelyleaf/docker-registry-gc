@@ -46,6 +46,7 @@ class CleanupJob(
             } else {
                 taskScheduler.scheduleWithFixedDelay(task, scheduler.fix!!)
             }
+            logger.info("load config for ${registry.baseUrl}")
 
         }
         this.maids = maids.toList()

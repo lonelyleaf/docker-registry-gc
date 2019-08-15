@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: docker-registry-gc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docker-registry-gc
+  namespace: docker-registry-gc
+data:
+  application.yaml: |-
+    docker.gc.registry:
+      - baseUrl: https://your-private.registry.location
+        #optinal,username and password for docker login
+        user: your-username
+        pass: yourpass
+        #when to run task
+        scheduler:
+          #execute periodically,with ISO-8601 duration format.
+          fix: PT1H #every 1 hour
+          #fix: P3D #every 3 days
+          #also support cron expression.but not use with fix.
+          cron: 0 0 1 * * ? # 1AM everyday
+        cleanup:
+          #define which image to match
+          - image: "^.*gmt.*$" #regexp of image name
+            tag: ".*test.*"    #regexp of tag
+            durationToKeep: P90D #image which is older than this will be deleted.also ISO-8601 duration format.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: docker-registry-gc
+  name: docker-registry-gc
+  namespace: docker-registry-gc
+spec:
+  selector:
+    matchLabels:
+      app: docker-registry-gc
+  template:
+    metadata:
+      labels:
+        app: docker-registry-gc
+    spec:
+      containers:
+        - image: lonelyleaf/docker-registry-gc:0.1
+          name: docker-registry-gc
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          stdin: true
+          tty: true
+          volumeMounts:
+            - mountPath: /app/config
+              name: config
+      volumes:
+        - configMap:
+            defaultMode: 256
+            items:
+              - key: application.yaml
+                path: application.yaml
+            name: docker-registry-gc
+            optional: false
+          name: config
