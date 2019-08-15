@@ -45,7 +45,7 @@ spec:
         app: docker-registry-gc
     spec:
       containers:
-        - image: lonelyleaf/docker-registry-gc:0.1
+        - image: lonelyleaf/docker-registry-gc
           name: docker-registry-gc
           imagePullPolicy: IfNotPresent
           resources:

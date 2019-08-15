@@ -29,7 +29,7 @@ docker.gc.registry:
 ```
 
 然后使用dockers启动`docker-registry-gc`：
-> docker run  -v {your_location}:/application.yaml:/app/config/application.yaml lonelyleaf/docker-registry-gc:0.1
+> docker run  -v {your_location}:/application.yaml:/app/config/application.yaml lonelyleaf/docker-registry-gc
 
 ## 如何配置
 该项目是标准的spring boot 项目，可以使用所有[Externalized Configuration](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-external-config.html) 

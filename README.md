@@ -31,7 +31,7 @@ docker.gc.registry:
 ```
 
 Then run `docker-registry-gc` by docker:
-> docker run  -v {your_location}:/application.yaml:/app/config/application.yaml lonelyleaf/docker-registry-gc:0.1
+> docker run  -v {your_location}:/application.yaml:/app/config/application.yaml lonelyleaf/docker-registry-gc
 
 ## How to config
 This is a stander spring boot application,so all config method in [Externalized Configuration](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-external-config.html) 
