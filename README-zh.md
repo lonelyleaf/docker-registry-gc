@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.com/lonelyleaf/docker-registry-gc.svg?branch=master)](https://travis-ci.com/lonelyleaf/docker-registry-gc)
 
-一个简单的，用于删除docker厂库无用镜像的服务。
+一个简单的，用于删除docker仓库无用镜像的服务。
 
 
 ## 快速开始
